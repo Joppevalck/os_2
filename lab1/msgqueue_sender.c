@@ -12,18 +12,16 @@
 #include <sys/wait.h>
 
 #define QUEUE_NAME "/pax"
-#define QUEUE_MAXMSG 16
+#define QUEUE_MAXMSG 10     // Can not be more than 10
 #define QUEUE_MSGSIZE 1024
 
-int main(void) {
-       
-    // ------------------- OPEN QUEUE -------------------
-    int open_flags = O_CREAT | O_RDWR | O_NONBLOCK;
-    int perms = S_IWUSR | S_IRUSR;
+typedef struct {
+    char msg[QUEUE_MSGSIZE];
+} msg_struct;
 
-    mqd_t mq_serv;
-    struct mq_attr mqAttr;
-    
+
+int main(void) {
+    // ------------------- UNLINK IF ANY PREVIOUS MQ WAS OPEN -------------------
 
     int status = mq_unlink(QUEUE_NAME);
     if (status < 0){
@@ -31,14 +29,24 @@ int main(void) {
             errno, strerror (errno));
     }
 
-    mqAttr.mq_maxmsg = 10;
-    mqAttr.mq_msgsize = 1024;
+    // ------------------- OPEN QUEUE -------------------
+
+    mqd_t mq_serv;
+    struct mq_attr mqAttr;
+
+    int open_flags = O_CREAT | O_RDWR | O_NONBLOCK;     // Flags
+    int perms = S_IWUSR | S_IRUSR;                      // Permissions
+
+    mqAttr.mq_maxmsg = QUEUE_MAXMSG;        // Set max amount of msg in queue
+    mqAttr.mq_msgsize = QUEUE_MSGSIZE;      // Set max size on msg
 
     mq_serv = mq_open(QUEUE_NAME, open_flags, perms, &mqAttr);
     if (mq_serv < 0){
         perror("mq_open failure from serv");
         exit(0);
     }
+
+    // ------------------- FORK TO HAVE DIFFERENT PROCESSES -------------------
 
 
     if(fork() == 0){
@@ -50,27 +58,20 @@ int main(void) {
             exit(0);
         }
 
-
         // ------------------- READ FROM FILE -------------------
 
-        char sndbuff[QUEUE_MSGSIZE];
+        msg_struct mq_msg;
 
         FILE *fp = fopen("a_text_file.txt", "r");
 
-        int sndcounter = 1;
-        int freadstatus = 1;
-        while(0 < freadstatus){
-
+        while(fread(&mq_msg.msg, sizeof(char), QUEUE_MSGSIZE, fp)){
         // ------------------- SEND MESSAGE -------------------
-            freadstatus = fread(&sndbuff, sizeof(char), QUEUE_MSGSIZE, fp);
-            status = mq_send(mq_cli, sndbuff, strlen(sndbuff), 1);
+            status = mq_send(mq_cli, (char *)&mq_msg, sizeof(mq_msg), 1);
 
             if (status < 0){
                 perror("mq_send failure on mq");
-            } else {
-                printf("successful call to mq_send\n");
-                printf("Sending: %d\n%s\n", sndcounter++, sndbuff);
-            }
+            } 
+            memset(mq_msg.msg, 0, sizeof(mq_msg.msg));      // Reset msg so there is no chars left in the msg after the read string
         }
 
         mq_close(mq_cli);
@@ -79,25 +80,27 @@ int main(void) {
         // ------------------- WAIT FOR SEND -------------------
 
         wait(NULL);
-        printf("---------------------- starting receive ------------------------\n");
-        char revbuff[QUEUE_MSGSIZE];
+
+        // ------------------- START RECEIVE -------------------
+
+        msg_struct recv_msg;
         int status;
-        int recv_counter = 0;
-        while(1 && recv_counter++ < 100){
-            status = mq_receive(mq_serv, revbuff, sizeof(revbuff), NULL);
-            if (status < 0) {
-                exit (1);
-            }
 
-            if (status == -1){
-                perror("mq_receive failure on mq");
-            } else {
-                printf("%s\n", revbuff);
+        while(1){
+            status = mq_receive(mq_serv, (char *)&recv_msg, sizeof(msg_struct), NULL);      // wanted to use mq_timedreceive(5) but it was not deterministic 
+
+            if (status < 0) {   // Nothing left to read, or something gone wrong
+                mq_close(mq_serv);
+                exit(1);
             }
-        }
-            mq_close(mq_serv);
+            printf("%s", recv_msg.msg);
+
+        }   
+
+        // ------------------- END -------------------
+
+        printf("\n");   // make sure everything is printed correctly
+        mq_close(mq_serv);
     }  
-
-
     return 0;
 }
