@@ -85,21 +85,28 @@ int main(void) {
 
         msg_struct recv_msg;
         int status;
-
+        long word_counter = 0; 
+        
         while(1){
             status = mq_receive(mq_serv, (char *)&recv_msg, sizeof(msg_struct), NULL);      // wanted to use mq_timedreceive(5) but it was not deterministic 
 
             if (status < 0) {   // Nothing left to read, or something gone wrong
-                mq_close(mq_serv);
-                exit(1);
+                break;
             }
-            printf("%s", recv_msg.msg);
 
+            int i = 0;
+            while(recv_msg.msg[i]!='\0'){
+                /* check whether the current character is white space or new line or tab character*/
+                if(recv_msg.msg[i]==' ' || recv_msg.msg[i]=='\n' || recv_msg.msg[i]=='\t') {
+                    word_counter++;
+                }
+                i++;
+            }
         }   
 
         // ------------------- END -------------------
 
-        printf("\n");   // make sure everything is printed correctly
+        printf("Amount of words: %ld\n", word_counter);
         mq_close(mq_serv);
     }  
     return 0;
