@@ -29,9 +29,6 @@ int main(int argc, char *argv[]) {
         close(pipefd[1]);
         wait( &status );        // parent: wait for the child (not really necessary)
 
-        // char fdpath[1024];
-        // snprintf(fdpath, 1024, "/proc/self/fd/%d", pipefd[0]);  // path of fd, temp file
-
         dup2(pipefd[0], STDIN_FILENO);
 
         char* wcargs[4];
