@@ -139,6 +139,7 @@ int main(void) {
             if(page_tlb.size == TLB_ENTRIES){
                 delete_last_tlb();
             }
+            
             add_tlb(page_num, page_table[page_num]);
         }
 
