@@ -23,14 +23,12 @@ typedef struct tlb{
 
 tlb page_tlb = {.head = NULL, .last = NULL, .size = 0};
 
-// void add_tlb(tlb *page_tlb, int page_num, long phys_addr){
 void add_tlb(int page, long phys){
     tlb_entry *to_add = malloc(sizeof(*to_add));
     to_add->page_num = page;
     to_add->phys_addr = phys;
 
     if(page_tlb.size == 0){
-
         page_tlb.head = to_add;
         page_tlb.last = to_add;
         page_tlb.size++;
@@ -47,7 +45,6 @@ void add_tlb(int page, long phys){
 
 }
 
-// void delete_last_tlb(tlb *page_tlb){
 void delete_last_tlb(){
     tlb_entry *new_last = page_tlb.last->prev;
     new_last->next = NULL;
@@ -139,7 +136,7 @@ int main(void) {
             if(page_tlb.size == TLB_ENTRIES){
                 delete_last_tlb();
             }
-            
+
             add_tlb(page_num, page_table[page_num]);
         }
 
